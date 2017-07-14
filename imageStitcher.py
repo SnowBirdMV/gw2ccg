@@ -31,7 +31,7 @@ def main():
     imageStitch(singleStitchList)
     #stitchClasses(classList)
 
-def generateSingleDeckImage(im, name):
+def generateSingleDeckImage(im, name, deckTemplateToBeChanged):
     global backFilePath
     back_im = Image.open(backFilePath)
     singleWidth, singleHeight = back_im.size
@@ -43,7 +43,7 @@ def generateSingleDeckImage(im, name):
     cardName = os.path.splitext(name)[0]
     cardName = re.sub(r'.*-', '', cardName)
     print("Card name is: " + cardName)
-    return generateSingleCardDeck(cardName, name)
+    return generateSingleCardDeck(cardName, name, deckTemplateToBeChanged)
 
 
 def saveImage(image, name, type):
@@ -59,7 +59,7 @@ def saveImage(image, name, type):
             os.chdir(path)
             image.save(path + name)
 
-def generateSingleCardDeck(name, fileName):
+def generateSingleCardDeck(name, fileName, deckTemplateToBeChanged):
     global cardTemplateGlobal, deckTemplateGlobal, bareDeckTemplateGlobal, bareSaveGlobal
     deckTemplateOG = json.load(open(deckTemplateGlobal))
     cardTemplateOG = json.load(open(cardTemplateGlobal))
@@ -76,17 +76,17 @@ def generateSingleCardDeck(name, fileName):
 
     deckInfo = generateDeckIDInfo(1, 2, 1)
     deckInfo["FaceURL"] = baseFileURL + "Decks" + "/" + fileName
-    bareDeckTemplate["CustomDeck"].pop("110")
-    bareDeckTemplate["CustomDeck"][globalCounter] = deckInfo
-    bareDeckTemplate["FaceURL"] = baseFileURL + "Decks" + "/" + fileName
-    bareDeckTemplate["ContainedObjects"].append(cardTemplate)
-
+    deckTemplateToBeChanged["CustomDeck"][globalCounter] = deckInfo
+    deckTemplateToBeChanged["CustomDeck"][globalCounter]["FaceURL"] = baseFileURL + "Decks" + "/" + fileName
     cardTemplate["Nickname"] = name
     cardTemplate["CardID"] = generateDeckIDsSingle(1)[0]
+    deckTemplateToBeChanged["ContainedObjects"].append(cardTemplate)
+
+
     print(cardTemplate["CardID"])
 
-    bareDeckTemplate["DeckIDs"].append(cardTemplate["CardID"])
-    return bareDeckTemplate
+    deckTemplateToBeChanged["DeckIDs"].append(cardTemplate["CardID"])
+    return deckTemplateToBeChanged
 
 
 
@@ -264,7 +264,6 @@ def stitchLegenderies(folderList):
         count = 0
         nameCount = 0
         for im in images:
-            generateSingleDeckImage(im)
             if xCount == width:
                 x_offset = 0
                 y_offset += im.size[1]
@@ -348,6 +347,8 @@ def imageStitch(folderList, doubleStitch=False):
                 nameCount = 0
                 bareSaveOG = json.load(open(bareSaveGlobal))
                 bareSave = deepcopy(bareSaveOG)
+                bareDeckTemplateOG = json.load(open(bareDeckTemplateGlobal))
+                deckTemplateToBeChanged = deepcopy(bareDeckTemplateOG)
                 for im in images:
                     if xCount == width:
                         x_offset = 0
@@ -363,8 +364,7 @@ def imageStitch(folderList, doubleStitch=False):
                     x_offset += im.size[0]
                     xCount += 1
 
-                    deck = generateSingleDeckImage(im, os.path.basename(fileNameList[nameCount]))
-                    bareSave["ObjectStates"].append(deck)
+                    deckTemplateToBeChanged = generateSingleDeckImage(im, os.path.basename(fileNameList[nameCount]), deckTemplateToBeChanged)
 
                     if doubleStitch:
                         if xCount == width:
@@ -391,6 +391,9 @@ def imageStitch(folderList, doubleStitch=False):
                     new_im.save(os.path.basename(root) + ".jpg")
                 os.chdir(dir_path)
                 new_im.save(imagesPath + os.path.basename(root) + ".jpg")
+
+                bareSave["ObjectStates"].append(deckTemplateToBeChanged)
+
                 with open(os.path.join(dir_path, "jsonOutput") + os.sep + os.path.basename(root) + '.json', 'w') as outfile:
                     json.dump(bareSave, outfile)
                 with open(os.path.basename(root) + '.json', 'w') as outfile:
