@@ -15,21 +15,25 @@ skillsList = ["Cards_Skills"]
 legendaryList = ["Cards_Legendary"]
 singleStitchList = ["Cards_Back_and_Info"]
 doubleStitchList = ["Cards_Basic", "Cards_Exotic"]
-backURL = "http://lukedowding.com/guildwars2-cardgame/game-files/tabletopsim/Dev/Decks/GW-CCG-Back.jpg"
+backURL = "http://lukedowding.com/guildwars2-cardgame/game-files/tabletopsim/SplitDecks/Decks/GW2-HotM-CCG-Back.jpg"
 deckTemplateGlobal = os.path.join(dir_path, "deckTemplate.json")
 cardTemplateGlobal = os.path.join(dir_path, "cardTemplate.json")
 bareDeckTemplateGlobal = os.path.join(dir_path, "bareDeckTemplate.json")
 bareSaveGlobal = os.path.join(dir_path, "bareSave.json")
-baseFileURL = "http://lukedowding.com/guildwars2-cardgame/game-files/tabletopsim/Dev/"
+baseFileURL = "http://lukedowding.com/guildwars2-cardgame/game-files/tabletopsim/SplitDecks/"
 globalCounter = 400
 
 
 def main():
     global singleStitchList, legendaryList
+    print("Stitching Legendaries:")
     #stitchLegenderies(legendaryList)
-    imageStitch(doubleStitchList, doubleStitch=True)
-    imageStitch(singleStitchList)
-    #stitchClasses(classList)
+    print("Stitching basics and exotics:")
+    #imageStitch(doubleStitchList, doubleStitch=True)
+    print("Stitching Rules:")
+    #imageStitch(singleStitchList)
+    print("Stitching Classes:")
+    stitchClasses(classList)
 
 def generateSingleDeckImage(im, name, deckTemplateToBeChanged):
     global backFilePath
@@ -42,6 +46,7 @@ def generateSingleDeckImage(im, name, deckTemplateToBeChanged):
 
     cardName = os.path.splitext(name)[0]
     cardName = re.sub(r'.*-', '', cardName)
+    cardName = re.sub(r"(?<=\w)([A-Z])", r" \1", cardName)
     print("Card name is: " + cardName)
     return generateSingleCardDeck(cardName, name, deckTemplateToBeChanged)
 
@@ -104,6 +109,7 @@ def stitchClasses(folderList):
         classNames = []
         professionList = []
         professionCardList = []
+        rawProfessionNames = []
         nameCount = 0
         profNameCount = 0
         curentDir = os.path.join(imagesPath, folder)
@@ -112,11 +118,13 @@ def stitchClasses(folderList):
             for fileName in files:
                 professionName = fileName[11:-4]
                 classNames.append(professionName)
+                rawProfessionNames.append(fileName)
                 professionCardList.append(os.path.join(os.path.join(imagesPath, "Cards_Professions"), fileName))
                 professionList.append(os.path.join(os.path.join(imagesPath, "Cards_Skills"), professionName))
             #images = map(Image.open, fileNameList)
 
         profCount = 0
+        rawFileNames = []
         for professionPath in professionList:
             deckTemplate = deepcopy(deckTemplateOG)
             count = 0
@@ -128,6 +136,7 @@ def stitchClasses(folderList):
                     name = name.split("-")[1]
                     name = re.sub(r"(\w)([A-Z])", r"\1 \2", name)
                     cardNames.append(name)
+                    rawFileNames.append(fileName)
                     images.append(Image.open(os.path.join(root, fileName)))
 
             totalCards = len(images) * 2
@@ -152,6 +161,10 @@ def stitchClasses(folderList):
             yCount = 0
             y_offset = 0
             iterCount = 0
+            bareSaveOG = json.load(open(bareSaveGlobal))
+            bareSave = deepcopy(bareSaveOG)
+            bareDeckTemplateOG = json.load(open(bareDeckTemplateGlobal))
+            deckTemplateToBeChanged = deepcopy(bareDeckTemplateOG)
             for im in images:
                 if iterCount == 0:
                     name = classNames[profCount]
@@ -167,6 +180,7 @@ def stitchClasses(folderList):
                     cardTemplate["Nickname"] = name
                     cardTemplate["CardID"] = deckIDs[count]
                     deckTemplate["ObjectStates"][0]["ContainedObjects"].append(cardTemplate)
+                    deckTemplateToBeChanged = generateSingleDeckImage(im, os.path.basename(rawProfessionNames[profCount]), deckTemplateToBeChanged)
                     count += 1
                 else:
                     if xCount == width:
@@ -181,6 +195,7 @@ def stitchClasses(folderList):
                     cardTemplate["Nickname"] = name
                     cardTemplate["CardID"] = deckIDs[count]
                     deckTemplate["ObjectStates"][0]["ContainedObjects"].append(cardTemplate)
+                    deckTemplateToBeChanged = generateSingleDeckImage(im, os.path.basename(rawFileNames[nameCount]), deckTemplateToBeChanged)
                     count += 1
 
                     if xCount == width:
@@ -189,7 +204,6 @@ def stitchClasses(folderList):
                         xCount = 0
                     cardTemplate = deepcopy(cardTemplateOG)
                     name = cardNames[nameCount]
-                    nameCount += 1
                     cardTemplate["Nickname"] = name
                     cardTemplate["CardID"] = deckIDs[count]
                     deckTemplate["ObjectStates"][0]["ContainedObjects"].append(cardTemplate)
@@ -197,6 +211,9 @@ def stitchClasses(folderList):
                     new_im.paste(im, (x_offset, y_offset))
                     x_offset += im.size[0]
                     xCount += 1
+                    deckTemplateToBeChanged = generateSingleDeckImage(im, os.path.basename(rawFileNames[nameCount]), deckTemplateToBeChanged)
+                    nameCount += 1
+
 
                 iterCount += 1
 
@@ -204,9 +221,15 @@ def stitchClasses(folderList):
 
             im = Image.open(backFilePath)
             new_im.paste(im, (im.size[0] * (width - 1), im.size[1] * (height - 1)))
-            with open(os.path.basename(root) + '.json', 'w') as outfile:
-                json.dump(deckTemplate, outfile)
+
+            bareSave["ObjectStates"].append(deckTemplateToBeChanged)
+
+            with open(os.path.join(dir_path, "jsonOutput") + os.sep + os.path.basename(root) + '.json', 'w') as outfile:
+                json.dump(bareSave, outfile)
                 globalCounter += 1
+
+
+
             for path in savePaths:
                 os.chdir(path)
                 new_im.save(os.path.basename(root) + ".jpg")
@@ -225,6 +248,7 @@ def stitchLegenderies(folderList):
         curentDir = os.path.join(imagesPath, folder)
         fileNameList = []
         cardNames = []
+        rawFileNameList = []
         for root, dirs, files in os.walk(curentDir):
             if os.path.basename(root) not in folderList:
                 fileNameList = []
@@ -233,11 +257,13 @@ def stitchLegenderies(folderList):
                     name = name.split("-")[0]
                     name = re.sub(r"(\w)([A-Z])", r"\1 \2", name)
                     cardNames.append(name)
+                    rawFileNameList.append(fileName)
                     fileNameList.append(os.path.join(root, fileName))
                 #images = map(Image.open, fileNameList)
 
                 for fileName in fileNameList:
                     images.append(Image.open(fileName))
+
         totalCards = len(images) + 1
         height, width = getDimentions(totalCards)
         widths, heights = zip(*(i.size for i in images))
@@ -263,6 +289,10 @@ def stitchLegenderies(folderList):
         y_offset = 0
         count = 0
         nameCount = 0
+        bareSaveOG = json.load(open(bareSaveGlobal))
+        bareSave = deepcopy(bareSaveOG)
+        bareDeckTemplateOG = json.load(open(bareDeckTemplateGlobal))
+        deckTemplateToBeChanged = deepcopy(bareDeckTemplateOG)
         for im in images:
             if xCount == width:
                 x_offset = 0
@@ -274,17 +304,25 @@ def stitchLegenderies(folderList):
             cardTemplate["Nickname"] = name
             cardTemplate["CardID"] = deckIDs[count]
             deckTemplate["ObjectStates"][0]["ContainedObjects"].append(cardTemplate)
+            print(str(len(fileNameList)))
+            deckTemplateToBeChanged = generateSingleDeckImage(im, os.path.basename(rawFileNameList[nameCount]),
+                                                              deckTemplateToBeChanged)
             nameCount += 1
             count += 1
             new_im.paste(im, (x_offset, y_offset))
             x_offset += im.size[0]
             xCount += 1
 
+
         im = Image.open(backFilePath)
         new_im.paste(im, (im.size[0] * (width - 1), im.size[1] * (height - 1)))
-        with open(os.path.basename(root) + '.json', 'w') as outfile:
-            json.dump(deckTemplate, outfile)
+
+        bareSave["ObjectStates"].append(deckTemplateToBeChanged)
+
+        with open(os.path.join(dir_path, "jsonOutput") + os.sep + os.path.basename(root) + '.json', 'w') as outfile:
+            json.dump(bareSave, outfile)
             globalCounter += 1
+
         for path in savePaths:
             os.chdir(path)
             new_im.save(os.path.basename(root) + ".jpg")
@@ -381,6 +419,8 @@ def imageStitch(folderList, doubleStitch=False):
                         new_im.paste(im, (x_offset, y_offset))
                         x_offset += im.size[0]
                         xCount += 1
+                        deckTemplateToBeChanged = generateSingleDeckImage(im, os.path.basename(fileNameList[nameCount]),
+                                                                          deckTemplateToBeChanged)
                     nameCount += 1
 
 
